@@ -20,7 +20,7 @@ async def train(request: TrainRequest) -> Dict:
 
     try:
         if request.train_params.model_type == "yolo":
-            return await train_yolo(request)
+            train_yolo(request)
 
         return {
             "status": "success",
