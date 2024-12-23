@@ -2,6 +2,8 @@ from fastapi import APIRouter
 from typing import Dict
 from models.train import TrainRequest
 
+from containers.yolo_container import train_yolo, inference_yolo
+
 router = APIRouter()
 
 @router.post("/train")
@@ -17,6 +19,9 @@ async def train(request: TrainRequest) -> Dict:
     """
 
     try:
+        if request.train_params.model_type == "yolo":
+            return await train_yolo(request)
+
         return {
             "status": "success",
             "message": "학습 시작",
