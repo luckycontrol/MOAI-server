@@ -1,10 +1,40 @@
 import docker
 from models.train import TrainRequest
+from models.inference import InferenceRequest
 
 client = docker.from_env()  
 
 async def train_yolo(request: TrainRequest):
+
     try:
+        old_container = client.containers.get("moai_yolo")
+
+        if old_container is not None:
+            old_container.remove(force=True)
+            print(f"Remove old container: {old_container.name}")
+
+        volumes = {
+            r"D:\moai_test": {
+                "bind": "/moai",
+                "mode": "rw"
+            }
+        }
+
+        container = client.containers.run(
+            "moai_yolo:latest",
+            name="moai_yolo",
+            volumes=volumes,
+            device_requests=[
+                docker.types.DeviceRequest(
+                    count=-1,
+                    capability=[["gpu"]]
+                )
+            ],
+            tty=True,
+            detach=False,
+            shm_size=8 * 1024 * 1024 * 1024
+        )
+        
         command = [
             "conda",
             "run",
