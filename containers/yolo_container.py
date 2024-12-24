@@ -5,7 +5,7 @@ from models.inference import InferenceRequest
 
 client = docker.from_env()
 
-async def train_yolo(request: TrainRequest):
+def train_yolo(request: TrainRequest):
     try:
         try:
             old_container = client.containers.get("moai_yolo")
@@ -36,8 +36,6 @@ async def train_yolo(request: TrainRequest):
             detach=False,
             shm_size=8 * 1024 * 1024 * 1024,
         )
-
-        container.start()
 
         command = [
             "conda",
@@ -85,7 +83,8 @@ async def train_yolo(request: TrainRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-async def inference_yolo(request: InferenceRequest):                                                           
+
+def inference_yolo(request: InferenceRequest):                                                          
     try:                                                                                                       
         command = [                                                                                            
             "python",                                                                                          
@@ -96,10 +95,10 @@ async def inference_yolo(request: InferenceRequest):
             f"--imgsz={request.imgsz}",                                                                        
             f"--conf-thres={request.conf_thres}",                                                                                                                            
             f"--source=/moai/{request.project}/{request.subproject}/{request.task}/dataset/inference_dataset/{request.source}",                                                                      
-        ]                                                                                                      
-                                                                                                            
-        container = client.containers.get("")                                                                  
-        exec_result = container.exec_run(command)                                                              
+        ]
+
+        container = client.containers.get("moai_yolo")
+        exec_result = container.exec_run(command)
         return {                                                                                               
             "status": "success",                                                                               
             "message": "추론 완료",                                                                            

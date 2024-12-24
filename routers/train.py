@@ -1,13 +1,13 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from typing import Dict
 from models.train import TrainRequest
 
-from containers.yolo_container import train_yolo, inference_yolo
+from containers.yolo_container import train_yolo
 
 router = APIRouter()
 
 @router.post("/train")
-async def train(request: TrainRequest, background_tasks: BackgroundTasks) -> Dict:
+async def train(request: TrainRequest) -> Dict:
     """
     학습 시작 엔드포인트.
 
@@ -20,8 +20,7 @@ async def train(request: TrainRequest, background_tasks: BackgroundTasks) -> Dic
     """
 
     try:
-        if request.train_params.model_type == "yolo":
-            background_tasks.add_task(train_yolo, request)
+        train_yolo(request)
 
         return {
             "status": "success",
