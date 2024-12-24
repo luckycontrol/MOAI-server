@@ -1,17 +1,19 @@
 import docker
 from models.train import TrainRequest
+from fastapi import HTTPException
 from models.inference import InferenceRequest
 
-client = docker.from_env()  
+client = docker.from_env()
 
 async def train_yolo(request: TrainRequest):
-
     try:
-        old_container = client.containers.get("moai_yolo")
-
-        if old_container is not None:
+        try:
+            old_container = client.containers.get("moai_yolo")
+            old_container.stop()
             old_container.remove(force=True)
-            print(f"Remove old container: {old_container.name}")
+            print(f"Removed old container: {old_container.name}")
+        except docker.errors.NotFound:
+            print("No old container found.")
 
         volumes = {
             r"D:\moai_test": {
@@ -32,9 +34,11 @@ async def train_yolo(request: TrainRequest):
             ],
             tty=True,
             detach=False,
-            shm_size=8 * 1024 * 1024 * 1024
+            shm_size=8 * 1024 * 1024 * 1024,
         )
-        
+
+        container.start()
+
         command = [
             "conda",
             "run",
@@ -58,28 +62,28 @@ async def train_yolo(request: TrainRequest):
 
         if request.train_params.resume:
             command.append("--resume")
-        
+
         if request.hyps.flipud:
             command.append("--flipud")
-        
+
         if request.hyps.fliplr:
             command.append("--fliplr")
-        
+
         if request.hyps.mosaic:
             command.append("--mosaic")
-    
-        container = client.containers.get("moai_yolo")
-        exec_result = container.exec_run(command)
+
+        exec_result = container.exec_run(command, stream=True)
+
+        for output in exec_result.output:
+            print(output.decode('utf-8'))
+
         return {
             "status": "success",
-            "message": "학습 완료"
+            "message": "Training completed",
         }
-    
+
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 async def inference_yolo(request: InferenceRequest):                                                           
     try:                                                                                                       
