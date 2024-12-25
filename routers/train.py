@@ -21,12 +21,6 @@ async def train(request: TrainRequest) -> Dict:
 
     try:
         train_yolo(request)
-
-        return {
-            "status": "success",
-            "message": "학습 진행 중",
-            "data": request.model_dump()
-        }
     
     except Exception as e:
         raise HTTPException(

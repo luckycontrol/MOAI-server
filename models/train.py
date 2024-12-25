@@ -25,5 +25,4 @@ class TrainRequest(BaseModel):
     task: str
     version: str
     train_params: TrainParams
-    hyps: Hyps
 
