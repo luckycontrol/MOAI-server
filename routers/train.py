@@ -4,7 +4,7 @@ from models.train import TrainRequest
 import docker
 
 from containers.yolo_container import train_yolo
-from utils.is_container_running import is_container_running
+from utils.get_running_container import get_running_container
 
 router = APIRouter()
 client = docker.from_env()
@@ -23,14 +23,14 @@ async def train(request: TrainRequest) -> Dict:
     """
 
     try:
-        # 현재 training 또는 inference 중인 컨테이너가 있는지 확인
-        is_running = is_container_running()
-        # 활성화된 container 가 있다면 GPU 사용중이므로 작업을 진행하지 않음
-        if is_running:
-            return {
-                "status": "error",
-                "message": "현재 GPU 사용중"
-            }
+        # # 현재 training 또는 inference 중인 컨테이너가 있는지 확인
+        # running_containers = get_running_container()
+        # # 활성화된 container 가 있다면 GPU 사용중이므로 작업을 진행하지 않음
+        # if is_running:
+        #     return {
+        #         "status": "error",
+        #         "message": "현재 GPU 사용중"
+        #     }
 
         if request.train_params.model_type == "yolo":
             train_yolo(request)

@@ -4,6 +4,11 @@ from fastapi import HTTPException
 from models.inference import InferenceRequest
 import time
 import threading
+import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 client = docker.from_env()
 
@@ -13,9 +18,9 @@ def train_yolo(request: TrainRequest):
             old_container = client.containers.get("moai_yolo")
             old_container.stop()
             old_container.remove(force=True)
-            print(f"Removed old container: {old_container.name}")
+            logger.info(f"Removed old container: {old_container.name}")
         except docker.errors.NotFound:
-            print("No old container found.")
+            logger.info("No old container found.")
 
         volumes = {
             r"D:\moai_test": {  # 변경된 볼륨 경로
@@ -38,7 +43,7 @@ def train_yolo(request: TrainRequest):
             f"--batch-size={request.train_params.batch_size}",
             f"--weights=/MOAI_yolo/weights/yolov5{request.train_params.weight_type}.pt",
             f"--epochs={request.train_params.epoch}",
-            f"--patience={request.train_params.patience}",
+            f"--patience={request.train_params.epoch}",
             f"--hyp=/moai/{request.project}/{request.subproject}/{request.task}/dataset/train_dataset/hyp.yaml",
         ]
 
@@ -64,10 +69,10 @@ def train_yolo(request: TrainRequest):
 
         def run_training(container, train_command):
             """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
-            print("YOLO container training started...")
+            logger.info("YOLO container training started...")
             exec_result = container.exec_run(train_command, stream=True)
             for output in exec_result.output:
-                print(output.decode('utf-8', errors='replace'), end='')
+                logger.info(output.decode('utf-8', errors='replace'))
 
             container.stop()
             container.remove(force=True)
@@ -77,7 +82,27 @@ def train_yolo(request: TrainRequest):
         training_thread.daemon = True  # 메인 스레드 종료 시 함께 종료
         training_thread.start()
 
+        start_time = time.time()
+        timeout = 120  # 2분 타임아웃
+
+        while True:
+            file_path = f"d:/moai_test/{request.project}/{request.subproject}/{request.task}/{request.version}/training_results/results.csv"
+            logger.info(f"Checking file path: {file_path}")
+            logger.info(f"File exists: {os.path.exists(file_path)}")
+            
+            if os.path.exists(file_path):
+                logger.info("results.csv file has been found!")
+                break
+            
+            if time.time() - start_time > timeout:
+                raise HTTPException(status_code=408, detail="Training timeout: results.csv was not generated within 2 minutes")
+            
+            time.sleep(5)  # 5초마다 확인
+
     except Exception as e:
+        container.stop()
+        container.remove(force=True)
+        
         raise HTTPException(status_code=400, detail=str(e))
 
 def inference_yolo(request: InferenceRequest):
@@ -86,9 +111,9 @@ def inference_yolo(request: InferenceRequest):
             old_container = client.containers.get("moai_yolo")
             old_container.stop()
             old_container.remove(force=True)
-            print(f"Removed old container: {old_container.name}")
+            logger.info(f"Removed old container: {old_container.name}")
         except docker.errors.NotFound:
-            print("No old container found.")
+            logger.info("No old container found.")
 
         inference_command = [
             "conda",
@@ -123,10 +148,10 @@ def inference_yolo(request: InferenceRequest):
 
         def run_inference(container, inference_command):
             """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
-            print("YOLO container inference started...")
+            logger.info("YOLO container inference started...")
             exec_result = container.exec_run(inference_command, stream=True)
             for output in exec_result.output:
-                print(output.decode('utf-8', errors='replace'), end='')
+                logger.info(output.decode('utf-8', errors='replace'), end='')
 
             container.stop()
             container.remove(force=True)
