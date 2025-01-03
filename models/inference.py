@@ -7,4 +7,3 @@ class InferenceRequest(BaseModel):
     version: str
     inference_name: str
     imgsz: int
-    conf_thres: float

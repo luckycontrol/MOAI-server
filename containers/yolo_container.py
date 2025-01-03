@@ -136,9 +136,10 @@ def inference_yolo(request: InferenceRequest):
             f"--name={request.inference_name}",
             f"--weights=/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/weights/best.pt",
             f"--imgsz={request.imgsz}",
-            f"--conf-thres={request.conf_thres}",
+            f"--conf-thres=0.1",
             f"--source=/moai/{request.project}/{request.subproject}/{request.task}/dataset/inference_dataset",
             f"--save-txt",
+            f"--save-conf"
         ]
 
         volumes = {
