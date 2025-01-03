@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-class TensorboardParams(BaseModel):
+class StopParams(BaseModel):
     project: str
     subproject: str
     task: str

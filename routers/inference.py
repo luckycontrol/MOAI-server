@@ -1,6 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from typing import Dict
 from models.inference import InferenceRequest
+from containers.yolo_container import inference_yolo
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -18,13 +22,11 @@ async def inference(request: InferenceRequest) -> Dict:
     """
 
     try:
-        return {
-            "status": "success",
-            "message": "추론 시작",
-            "data": request.model_dump()
-        }
+        return inference_yolo(request)
 
     except Exception as e:
+        logger.error(e)
+
         raise HTTPException(
             status_code=400,
             detail=str(e)

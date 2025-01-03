@@ -14,8 +14,10 @@ client = docker.from_env()
 
 def train_yolo(request: TrainRequest):
     try:
+        container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}"
+
         try:
-            old_container = client.containers.get("moai_yolo")
+            old_container = client.containers.get(container_name)
             old_container.stop()
             old_container.remove(force=True)
             logger.info(f"Removed old container: {old_container.name}")
@@ -49,11 +51,10 @@ def train_yolo(request: TrainRequest):
 
         if request.train_params.resume:
             train_command.append("--resume")
-            train_command
 
         container = client.containers.run(
             image="moai_yolo:latest",  # 이미지 이름 및 태그 지정
-            name="moai_yolo",
+            name=container_name,
             volumes=volumes,
             device_requests=[
                 docker.types.DeviceRequest(
@@ -69,7 +70,7 @@ def train_yolo(request: TrainRequest):
 
         def run_training(container, train_command):
             """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
-            logger.info("YOLO container training started...")
+            logger.info("[TRAINING] YOLO container training started...")
             exec_result = container.exec_run(train_command, stream=True)
             for output in exec_result.output:
                 logger.info(output.decode('utf-8', errors='replace'))
@@ -106,14 +107,23 @@ def train_yolo(request: TrainRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 def inference_yolo(request: InferenceRequest):
+    inference_path = f"D:/moai_test/{request.project}/{request.subproject}/{request.task}/{request.version}/inference_results/{request.inference_name}"
+    if os.path.exists(inference_path):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{request.inference_name} 이 이미 존재합니다."
+        )   
+
     try:
+        container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}"
+
         try:
-            old_container = client.containers.get("moai_yolo")
+            old_container = client.containers.get(container_name)
             old_container.stop()
             old_container.remove(force=True)
-            logger.info(f"Removed old container: {old_container.name}")
+            logger.info(f"[INFERENCE] Removed old container: {old_container.name}")
         except docker.errors.NotFound:
-            logger.info("No old container found.")
+            logger.info("[INFERENCE] No old container found.")
 
         inference_command = [
             "conda",
@@ -128,11 +138,19 @@ def inference_yolo(request: InferenceRequest):
             f"--imgsz={request.imgsz}",
             f"--conf-thres={request.conf_thres}",
             f"--source=/moai/{request.project}/{request.subproject}/{request.task}/dataset/inference_dataset",
+            f"--save-txt",
         ]
+
+        volumes = {
+            r"D:\moai_test": {  # 변경된 볼륨 경로
+                "bind": "/moai",
+                "mode": "rw"
+            }
+        }
 
         container = client.containers.run(
             image="moai_yolo:latest",  # 이미지 이름 및 태그 지정
-            name="moai_yolo",
+            name=container_name,
             volumes=volumes,
             device_requests=[
                 docker.types.DeviceRequest(
@@ -146,28 +164,23 @@ def inference_yolo(request: InferenceRequest):
             shm_size="32G",  # 변경된 shm-size
         )
 
-        def run_inference(container, inference_command):
-            """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
-            logger.info("YOLO container inference started...")
-            exec_result = container.exec_run(inference_command, stream=True)
-            for output in exec_result.output:
-                logger.info(output.decode('utf-8', errors='replace'), end='')
+        logger.info("[INFERENCE] YOLO container inference started...")
+        exec_result = container.exec_run(inference_command, stream=True)
+        for output in exec_result.output:
+            logger.info(output.decode('utf-8', errors='replace'))
 
-            container.stop()
-            container.remove(force=True)
+        container.stop()
+        container.remove(force=True)
 
-            return {
-                "status": "success",
-                "message": "학습 완료"
-            }
-        
-        # 예측을 별도의 스레드에서 실행
-        inference_thread = threading.Thread(target=run_inference, args=(container, inference_command))
-        inference_thread.daemon = True  # 메인 스레드 종료 시 함께 종료
-        inference_thread.start()
+        return {
+            "status": "success",
+            "message": "추론 완료"
+        }
 
     except Exception as e:
+        logger.error(e)
+
         raise HTTPException(
-            status_code=500,
+            status_code=400,
             detail=str(e)
         )
