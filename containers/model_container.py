@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 client = docker.from_env()
 
-def train_yolo(request: TrainRequest):
+def train_model(request: TrainRequest):
     try:
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}"
 
@@ -25,35 +25,26 @@ def train_yolo(request: TrainRequest):
             logger.info("No old container found.")
 
         volumes = {
-            r"D:\moai_test": {  # 변경된 볼륨 경로
+            request.volume_path: {  # 변경된 볼륨 경로
                 "bind": "/moai",
                 "mode": "rw"
             }
         }
 
+        # 컨테이너 내부에서 모델 실행 명령어
         train_command = [
             "conda",
             "run",
             "-n",
-            "yolo",
+            request.model_type, # 가상 환경 이름은 모델 이름과 동일하게
             "python",
             "train.py",
             f"--project=/moai/{request.project}/{request.subproject}/{request.task}",
             f"--name={request.version}",
-            f"--data=/moai/{request.project}/{request.subproject}/{request.task}/dataset/train_dataset/data.yaml",
-            f"--imgsz={request.train_params.imgsz}",
-            f"--batch-size={request.train_params.batch_size}",
-            f"--weights=/MOAI_yolo/weights/yolov5{request.train_params.weight_type}.pt",
-            f"--epochs={request.train_params.epoch}",
-            f"--patience={request.train_params.epoch}",
-            f"--hyp=/moai/{request.project}/{request.subproject}/{request.task}/dataset/train_dataset/hyp.yaml",
         ]
 
-        if request.train_params.resume:
-            train_command.append("--resume")
-
         container = client.containers.run(
-            image="moai_yolo:latest",  # 이미지 이름 및 태그 지정
+            image=f"{request.model_type}:latest",  # 이미지 이름 및 태그 지정
             name=container_name,
             volumes=volumes,
             device_requests=[
@@ -87,7 +78,7 @@ def train_yolo(request: TrainRequest):
         timeout = 120  # 2분 타임아웃
 
         while True:
-            file_path = f"d:/moai_test/{request.project}/{request.subproject}/{request.task}/{request.version}/training_results/results.csv"
+            file_path = f"{request.volume_path}/{request.project}/{request.subproject}/{request.task}/{request.version}/training_results/results.csv"
             logger.info(f"Checking file path: {file_path}")
             logger.info(f"File exists: {os.path.exists(file_path)}")
             
@@ -106,8 +97,8 @@ def train_yolo(request: TrainRequest):
         
         raise HTTPException(status_code=400, detail=str(e))
 
-def inference_yolo(request: InferenceRequest):
-    inference_path = f"D:/moai_test/{request.project}/{request.subproject}/{request.task}/{request.version}/inference_results/{request.inference_name}"
+def inference_model(request: InferenceRequest):
+    inference_path = f"{request.volume_path}/{request.project}/{request.subproject}/{request.task}/{request.version}/inference_results/{request.inference_name}"
     if os.path.exists(inference_path):
         raise HTTPException(
             status_code=400,
@@ -129,28 +120,23 @@ def inference_yolo(request: InferenceRequest):
             "conda",
             "run",
             "-n",
-            "yolo",
+            request.model_type, # 가상 환경 이름은 모델 이름과 동일하게
             "python",
             "detect.py",
             f"--project=/moai/{request.project}/{request.subproject}/{request.task}/{request.version}",
             f"--name={request.inference_name}",
-            f"--weights=/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/weights/best.pt",
             f"--imgsz={request.imgsz}",
-            f"--conf-thres=0.1",
-            f"--source=/moai/{request.project}/{request.subproject}/{request.task}/dataset/inference_dataset",
-            f"--save-txt",
-            f"--save-conf"
         ]
 
         volumes = {
-            r"D:\moai_test": {  # 변경된 볼륨 경로
+            request.volume_path: {  # 변경된 볼륨 경로
                 "bind": "/moai",
                 "mode": "rw"
             }
         }
 
         container = client.containers.run(
-            image="moai_yolo:latest",  # 이미지 이름 및 태그 지정
+            image=f"{request.model_type}:latest",  # 이미지 이름 및 태그 지정
             name=container_name,
             volumes=volumes,
             device_requests=[
