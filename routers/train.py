@@ -3,7 +3,7 @@ from typing import Dict
 from models.train import TrainRequest
 import docker
 
-from containers.yolo_container import train_yolo
+from containers.model_container import train_model
 from utils.get_running_container import get_running_container
 
 router = APIRouter()
@@ -32,9 +32,8 @@ async def train(request: TrainRequest) -> Dict:
         #         "message": "현재 GPU 사용중"
         #     }
 
-        if request.train_params.model_type == "yolo":
-            train_yolo(request)
-
+        train_model(request)
+            
         return {
             "status": "in_progress",
             "message": "학습 진행 중",

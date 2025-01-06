@@ -6,6 +6,7 @@ import time
 import threading
 import os
 import logging
+import yaml
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ client = docker.from_env()
 
 def train_model(request: TrainRequest):
     try:
-        container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}"
+        container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_train"
 
         try:
             old_container = client.containers.get(container_name)
@@ -25,7 +26,7 @@ def train_model(request: TrainRequest):
             logger.info("No old container found.")
 
         volumes = {
-            request.volume_path: {  # 변경된 볼륨 경로
+            f"{request.volume_path}": {  # 변경된 볼륨 경로
                 "bind": "/moai",
                 "mode": "rw"
             }
@@ -36,11 +37,13 @@ def train_model(request: TrainRequest):
             "conda",
             "run",
             "-n",
-            request.model_type, # 가상 환경 이름은 모델 이름과 동일하게
+            f"{request.model_type}", # 가상 환경 이름은 모델 이름과 동일하게
             "python",
             "train.py",
-            f"--project=/moai/{request.project}/{request.subproject}/{request.task}",
-            f"--name={request.version}",
+            f"--project={request.project}",
+            f"--subproject={request.subproject}",
+            f"--task={request.task}",
+            f"--version={request.version}"
         ]
 
         container = client.containers.run(
@@ -97,16 +100,10 @@ def train_model(request: TrainRequest):
         
         raise HTTPException(status_code=400, detail=str(e))
 
-def inference_model(request: InferenceRequest):
-    inference_path = f"{request.volume_path}/{request.project}/{request.subproject}/{request.task}/{request.version}/inference_results/{request.inference_name}"
-    if os.path.exists(inference_path):
-        raise HTTPException(
-            status_code=400,
-            detail=f"{request.inference_name} 이 이미 존재합니다."
-        )   
-
+def inference_model(request: InferenceRequest):   
     try:
-        container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}"
+        # 컨테이너 이름. 형식: project_subproject_task_version
+        container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_inference"
 
         try:
             old_container = client.containers.get(container_name)
@@ -120,16 +117,19 @@ def inference_model(request: InferenceRequest):
             "conda",
             "run",
             "-n",
-            request.model_type, # 가상 환경 이름은 모델 이름과 동일하게
+            f"{request.model_type}", # 가상 환경 이름은 모델 이름과 동일하게
             "python",
             "detect.py",
-            f"--project=/moai/{request.project}/{request.subproject}/{request.task}/{request.version}",
+            f"--project={request.project}",
+            f"--subproject={request.subproject}",
+            f"--task={request.task}",
+            f"--version={request.version}",
             f"--name={request.inference_name}",
             f"--imgsz={request.imgsz}",
         ]
 
         volumes = {
-            request.volume_path: {  # 변경된 볼륨 경로
+            f"{request.volume_path}": {  # 변경된 볼륨 경로
                 "bind": "/moai",
                 "mode": "rw"
             }
@@ -151,23 +151,24 @@ def inference_model(request: InferenceRequest):
             shm_size="32G",  # 변경된 shm-size
         )
 
-        logger.info("[INFERENCE] YOLO container inference started...")
-        exec_result = container.exec_run(inference_command, stream=True)
-        for output in exec_result.output:
-            logger.info(output.decode('utf-8', errors='replace'))
+        def run_inference(container, inference_command):
+            """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
+            logger.info("[INFERENCE] YOLO container inference started...")
+            exec_result = container.exec_run(inference_command, stream=True)
+            for output in exec_result.output:
+                logger.info(output.decode('utf-8', errors='replace'))
 
-        container.stop()
-        container.remove(force=True)
+            container.stop()
+            container.remove(force=True)
 
-        return {
-            "status": "success",
-            "message": "추론 완료"
-        }
+        # 예측을 별도의 스레드에서 실행
+        inference_thread = threading.Thread(target=run_inference, args=(container, inference_command))
+        inference_thread.daemon = True  # 메인 스레드 종료 시 함께 종료
+        inference_thread.start()
 
     except Exception as e:
         logger.error(e)
 
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
+        container.stop()
+        container.remove(force=True)
+        raise HTTPException(status_code=400, detail=str(e))

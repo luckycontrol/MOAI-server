@@ -4,6 +4,7 @@ from utils.get_running_container import get_running_container
 from models.stop import StopParams
 import docker
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +32,15 @@ async def stop(request: StopParams) -> Dict:
 
         # 특정 이름의 컨테이너 가져오기
         containers = client.containers.list(all=True)
-        container = [c for c in containers if c.name == container_name][0]
+        container = [c for c in containers if c.name == f"{container_name}/train" or c.name == f"{container_name}/inference"][0]
         
         if container.status == "running":
+            if container.name.endswith("inference"):
+                os.removedirs(f"{request.volume_path}/{request.project}/{request.subproject}/{request.task}/{request.version}/inference_results")
+
             # 컨테이너가 실행 중이면 stop 후 remove
             container.stop()
+            
             logger.info(f"[STOP] 컨테이너({container_name}) 학습 및 예측 종료")
 
         else:
