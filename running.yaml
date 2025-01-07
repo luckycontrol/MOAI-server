@@ -1,6 +1,0 @@
-inference_name: ''
-is_running: true
-project: test_project
-subproject: sub_project
-task: detection
-version: v1

@@ -2,16 +2,14 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict
 from models.inference import InferenceRequest
 from containers.model_container import inference_model
-from utils.check_yaml import load_yaml, save_yaml
+import subprocess
 
 import logging
 import os
-import yaml
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
 
 @router.post("/inference")
 async def inference(request: InferenceRequest) -> Dict:
@@ -26,12 +24,12 @@ async def inference(request: InferenceRequest) -> Dict:
     """
 
     try:
-        running_params = load_yaml()
-
-        if running_params["is_running"] == True:
+        # 현재 학습중이거나 예측중이면 예측 X
+        running_containers = subprocess.check_output(["docker", "ps", "-q"]).decode().strip()
+        if running_containers:
             raise HTTPException(
                 status_code=400,
-                detail=f"현재 GPU 사용중: {running_params['task']}"
+                detail="현재 GPU 사용중"
             )
 
         # inference_name: inference 결과 저장할 폴더 이름
@@ -42,12 +40,6 @@ async def inference(request: InferenceRequest) -> Dict:
                 status_code=400,
                 detail=f"{request.inference_name} 이 이미 존재합니다."
             )
-
-        save_yaml(
-            request=request,
-            is_running=True,
-            is_train=False
-        )
 
         inference_model(request)
 

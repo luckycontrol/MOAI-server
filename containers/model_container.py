@@ -6,7 +6,6 @@ import time
 import threading
 import os
 import logging
-import yaml
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

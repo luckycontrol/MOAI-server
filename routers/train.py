@@ -1,13 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from typing import Dict
-from models.train import TrainRequest
-import docker
+import os
+import subprocess
 
+from models.train import TrainRequest
 from containers.model_container import train_model
-from utils.get_running_container import get_running_container
 
 router = APIRouter()
-client = docker.from_env()
 
 @router.post("/train")
 async def train(request: TrainRequest) -> Dict:
@@ -16,21 +15,26 @@ async def train(request: TrainRequest) -> Dict:
 
     Args:
         request (TrainRequest): 학습에 필요한 정보
-        background_tasks (BackgroundTasks): 백그라운드 작업 관리자
 
     Returns:
         Dict: 요청 처리 결과
     """
 
     try:
-        # # 현재 training 또는 inference 중인 컨테이너가 있는지 확인
-        # running_containers = get_running_container()
-        # # 활성화된 container 가 있다면 GPU 사용중이므로 작업을 진행하지 않음
-        # if is_running:
-        #     return {
-        #         "status": "error",
-        #         "message": "현재 GPU 사용중"
-        #     }
+        # version 이 이미 있는 경우 중복되므로 학습 X
+        path = f"{request.volume_path}/{request.project}/{request.subproject}/{request.task}/{request.version}"
+        if os.path.exists(path):
+            raise HTTPException(
+                status_code=400,
+                detail="프로젝트에 버전이 이미 존재함"
+            )
+
+        running_containers = subprocess.check_output(["docker", "ps", "-q"]).decode().strip()
+        if running_containers:
+            raise HTTPException(
+                status_code=400,
+                detail=f"현재 GPU 사용중: {request.task}"
+            )
 
         train_model(request)
             
