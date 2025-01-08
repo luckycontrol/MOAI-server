@@ -79,7 +79,16 @@ def train_model(request: TrainRequest):
         start_time = time.time()
         timeout = 120  # 2분 타임아웃
 
+        # results.csv 파일 찾을 때까지 대기
         while True:
+            # results.csv 파일을 찾는 중, 에러로 인해 모델 컨테이너가 종료되면 예외raise
+            container = client.containers.get(container_name)
+            if container.status != "running":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"[Training] 학습 실패"
+                )
+
             file_path = f"{request.volume_path}/{request.project}/{request.subproject}/{request.task}/{request.version}/training_results/results.csv"
             logger.info(f"Checking file path: {file_path}")
             logger.info(f"File exists: {os.path.exists(file_path)}")
