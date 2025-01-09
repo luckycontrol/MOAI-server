@@ -60,7 +60,7 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
 
         # 볼륨 설정 (예시)
         volumes = {
-            r"D:\moai_test": {
+            r"d:/moai": {
                 "bind": "/moai",
                 "mode": "rw"
             }

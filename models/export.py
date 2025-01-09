@@ -1,8 +1,7 @@
 from pydantic import BaseModel
 
-class InferenceRequest(BaseModel):
+class ExportRequest(BaseModel):
     project: str
     subproject: str
     task: str
     version: str
-    model_type: str

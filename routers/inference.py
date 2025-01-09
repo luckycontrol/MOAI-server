@@ -25,21 +25,22 @@ async def inference(request: InferenceRequest) -> Dict:
 
     try:
         # 현재 학습중이거나 예측중이면 예측 X
-        running_containers = subprocess.check_output(["docker", "ps", "-q"]).decode().strip()
-        if running_containers:
-            raise HTTPException(
-                status_code=400,
-                detail="현재 GPU 사용중"
-            )
+        running_container_ids = subprocess.check_output(["docker", "ps", "-q"]).decode().strip().split()  # Split into list of IDs
+        for container_id in running_container_ids:
+            # Get the container name
+            container_name = subprocess.check_output([
+                "docker", "inspect", "--format={{.Name}}", container_id
+            ]).decode().strip().lstrip('/')  # Remove leading slash from name
+            if not container_name.endswith('_export'):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Non-export container running: {container_name}"
+                )
 
-        # inference_name: inference 결과 저장할 폴더 이름
-        # inference_name 과 동일한 결과 저장 폴더가 있는지 확인. 있으면 에러.
-        inference_path = f"{request.volume_path}/{request.project}/{request.subproject}/{request.task}/{request.version}/inference_results/{request.inference_name}"
-        if os.path.exists(inference_path):
-            raise HTTPException(
-                status_code=400,
-                detail=f"{request.inference_name} 이 이미 존재합니다."
-            )
+        # inference_result 폴더 제거
+        inference_result_path = f"d:/moai_test/{request.project}/{request.subproject}/{request.task}/{request.version}/inference_result"
+        if os.path.exists(inference_result_path):
+            os.removedirs(inference_result_path)
 
         inference_model(request)
 

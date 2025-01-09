@@ -1,19 +1,24 @@
 import docker
 from models.train import TrainRequest
-from fastapi import HTTPException
 from models.inference import InferenceRequest
+from models.export import ExportRequest
+from fastapi import HTTPException
 import time
 import threading
 import os
 import logging
+import yaml
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 client = docker.from_env()
 
+VOLUME_PATH = "d:/moai_test"
+
 def train_model(request: TrainRequest):
     try:
+        # 컨테이너 이름 형식: project_subproject_task_version_train
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_train"
 
         try:
@@ -24,8 +29,9 @@ def train_model(request: TrainRequest):
         except docker.errors.NotFound:
             logger.info("No old container found.")
 
+        # 모델 컨테이너의 볼륨 관리
         volumes = {
-            f"{request.volume_path}": {  # 변경된 볼륨 경로
+            f"{VOLUME_PATH}": {  # 변경된 볼륨 경로
                 "bind": "/moai",
                 "mode": "rw"
             }
@@ -36,7 +42,7 @@ def train_model(request: TrainRequest):
             "conda",
             "run",
             "-n",
-            f"{request.model_type}", # 가상 환경 이름은 모델 이름과 동일하게
+            f"{request.model_type}", # 가상 환경 이름은 모델 이름과 동일하게 (yolo, yolo_obb)
             "python",
             "train.py",
             f"--project={request.project}",
@@ -45,21 +51,48 @@ def train_model(request: TrainRequest):
             f"--version={request.version}"
         ]
 
-        container = client.containers.run(
-            image=f"{request.model_type}:latest",  # 이미지 이름 및 태그 지정
-            name=container_name,
-            volumes=volumes,
-            device_requests=[
-                docker.types.DeviceRequest(
-                    count=-1,  # 모든 GPU 사용
-                    capabilities=[["gpu"]]
-                )
-            ],
-            tty=True,
-            stdin_open=True, # -i 옵션 추가
-            detach=True,
-            shm_size="32G",  # 변경된 shm-size
-        )
+        # 현재 학습의 hyp 정보 로드
+        hyp_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/dataset/train_dataset/hyp.yaml"
+        with open(hyp_path, 'r') as f:
+            hyp = yaml.safe_load(f)
+
+        # 현재 학습에 대한 정보를 yaml 로 저장
+        os.mkdir(f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}")
+        yaml_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+
+        yaml_content = {
+            "project": request.project,
+            "subproject": request.subproject,
+            "task": request.task,
+            "version": request.version,
+            "model_type": request.model_type,
+            "imgsz": hyp['imgsz'],
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        with open(yaml_path, 'w') as f:
+            yaml.dump(yaml_content, f)
+
+        try:
+            container = client.containers.run(
+                image=f"{request.model_type}:latest",  # 이미지 이름 및 태그 지정
+                name=container_name,
+                volumes=volumes,
+                device_requests=[
+                    docker.types.DeviceRequest(
+                        count=-1,  # 모든 GPU 사용
+                        capabilities=[["gpu"]]
+                    )
+                ],
+                tty=True,
+                stdin_open=True, # -i 옵션 추가
+                detach=True,
+                shm_size="32G",  # 변경된 shm-size
+            )
+            logger.info(f"Container {container_name} started successfully.")
+        except Exception as e:
+            logger.error(f"Failed to start container {container_name}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to start container: {str(e)}")
 
         def run_training(container, train_command):
             """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
@@ -89,7 +122,7 @@ def train_model(request: TrainRequest):
                     detail=f"[Training] 학습 실패"
                 )
 
-            file_path = f"{request.volume_path}/{request.project}/{request.subproject}/{request.task}/{request.version}/training_results/results.csv"
+            file_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/training_results/results.csv"
             logger.info(f"Checking file path: {file_path}")
             logger.info(f"File exists: {os.path.exists(file_path)}")
             
@@ -103,9 +136,7 @@ def train_model(request: TrainRequest):
             time.sleep(5)  # 5초마다 확인
 
     except Exception as e:
-        container.stop()
-        container.remove(force=True)
-        
+        logger.info(f"Training failed: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
 def inference_model(request: InferenceRequest):   
@@ -132,32 +163,35 @@ def inference_model(request: InferenceRequest):
             f"--subproject={request.subproject}",
             f"--task={request.task}",
             f"--version={request.version}",
-            f"--name={request.inference_name}",
-            f"--imgsz={request.imgsz}",
         ]
 
         volumes = {
-            f"{request.volume_path}": {  # 변경된 볼륨 경로
+            f"{VOLUME_PATH}": {  # 변경된 볼륨 경로
                 "bind": "/moai",
                 "mode": "rw"
             }
         }
 
-        container = client.containers.run(
-            image=f"{request.model_type}:latest",  # 이미지 이름 및 태그 지정
-            name=container_name,
-            volumes=volumes,
-            device_requests=[
-                docker.types.DeviceRequest(
-                    count=-1,  # 모든 GPU 사용
-                    capabilities=[["gpu"]]
-                )
-            ],
-            tty=True,
-            stdin_open=True, # -i 옵션 추가
-            detach=True,
-            shm_size="32G",  # 변경된 shm-size
-        )
+        try:
+            container = client.containers.run(
+                image=f"{request.model_type}:latest",  # 이미지 이름 및 태그 지정
+                name=container_name,
+                volumes=volumes,
+                device_requests=[
+                    docker.types.DeviceRequest(
+                        count=-1,  # 모든 GPU 사용
+                        capabilities=[["gpu"]]
+                    )
+                ],
+                tty=True,
+                stdin_open=True, # -i 옵션 추가
+                detach=True,
+                shm_size="32G",  # 변경된 shm-size
+            )
+            logger.info(f"Container {container_name} started successfully.")
+        except Exception as e:
+            logger.error(f"Failed to start container {container_name}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to start container: {str(e)}")
 
         def run_inference(container, inference_command):
             """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
@@ -176,7 +210,82 @@ def inference_model(request: InferenceRequest):
 
     except Exception as e:
         logger.error(e)
+        raise HTTPException(status_code=400, detail=str(e))
 
-        container.stop()
-        container.remove(force=True)
+def export_model(request: ExportRequest):
+    try:
+        container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_export"
+
+        yaml_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+        with open(yaml_path, 'r') as f:
+            yaml_content = yaml.safe_load(f)
+
+        model_type = yaml_content["model_type"]
+        imgsz = yaml_content['imgsz']
+
+        try:
+            old_container = client.containers.get(container_name)
+            old_container.stop()
+            old_container.remove(force=True)
+            logger.info(f"[EXPORT] Removed old container: {old_container.name}")
+        except docker.errors.NotFound:
+            logger.info("[EXPORT] No old container found.")
+
+        export_command = [
+            "conda",
+            "run",
+            "-n",
+            f"{model_type}", # 가상 환경 이름은 모델 이름과 동일하게
+            "python",
+            "export.py",
+            f"--weights=/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/weights/best.pt",
+            f"--imgsz={imgsz}",
+            f"--opset=13"
+        ]
+
+        volumes = {
+            f"{VOLUME_PATH}": {  # 변경된 볼륨 경로
+                "bind": "/moai",
+                "mode": "rw"
+            }
+        }
+
+        try:
+            container = client.containers.run(
+                image=f"{model_type}:latest",  # 이미지 이름 및 태그 지정
+                name=container_name,
+                volumes=volumes,
+                device_requests=[
+                    docker.types.DeviceRequest(
+                        count=-1,  # 모든 GPU 사용
+                        capabilities=[["gpu"]]
+                    )
+                ],
+                tty=True,
+                stdin_open=True, # -i 옵션 추가
+                detach=True,
+                shm_size="32G",  # 변경된 shm-size
+            )
+            logger.info(f"Container {container_name} started successfully.")
+        except Exception as e:
+            logger.error(f"Failed to start container {container_name}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to start container: {str(e)}")
+
+        def run_export(container, export_command):
+            """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
+            logger.info("[EXPORT] YOLO container export started...")
+            exec_result = container.exec_run(export_command, stream=True)
+            for output in exec_result.output:
+                logger.info(output.decode('utf-8', errors='replace'))
+
+            container.stop()
+            container.remove(force=True)
+
+        # 예측을 별도의 스레드에서 실행
+        export_thread = threading.Thread(target=run_export, args=(container, export_command))
+        export_thread.daemon = True  # 메인 스레드 종료 시 함께 종료
+        export_thread.start()
+
+    except Exception as e:
+        logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
