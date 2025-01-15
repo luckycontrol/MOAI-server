@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
 from typing import Dict
-import os
 import subprocess
 
 from models.train import TrainRequest
@@ -27,28 +26,21 @@ async def train(request: TrainRequest) -> Dict:
     try:
         logger.info(f"[Train] 학습 요청 수신: {request}")
 
-        # # version 이 이미 있는 경우 중복되므로 학습 X
-        # path = f"d:/moai_test/{request.project}/{request.subproject}/{request.task}/{request.version}"
-        # if os.path.exists(path):
-        #     raise HTTPException(
-        #         status_code=400,
-        #         detail="프로젝트에 버전이 이미 존재함"
-        #     )
-
+        # 현재 학습중이거나 예측중인 컨테이너가 있으면 X
         running_container_ids = subprocess.check_output(["docker", "ps", "-q"]).decode().strip().split()  # Split into list of IDs
         for container_id in running_container_ids:
             # Get the container name
             container_name = subprocess.check_output([
                 "docker", "inspect", "--format={{.Name}}", container_id
             ]).decode().strip().lstrip('/')  # Remove leading slash from name
-            if not container_name.endswith('_export'):
+            if not container_name.endswith('_export') or not container_name.endswith('_tensorboard'):
                 raise HTTPException(
                     status_code=400,
                     detail=f"Non-export container running: {container_name}"
                 )
 
         train_model(request)
-            
+
         return {
             "status": "in_progress",
             "message": "학습 진행 중",

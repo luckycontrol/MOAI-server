@@ -9,12 +9,12 @@ import os
 import logging
 import yaml
 
+from utils import VOLUME_PATH
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 client = docker.from_env()
-
-VOLUME_PATH = "d:/moai_test"
 
 def train_model(request: TrainRequest):
     try:
@@ -39,16 +39,13 @@ def train_model(request: TrainRequest):
 
         # 컨테이너 내부에서 모델 실행 명령어
         train_command = [
-            "conda",
-            "run",
-            "-n",
-            f"{request.model_type}", # 가상 환경 이름은 모델 이름과 동일하게 (yolo, yolo_obb)
-            "python",
-            "train.py",
-            f"--project={request.project}",
-            f"--subproject={request.subproject}",
-            f"--task={request.task}",
-            f"--version={request.version}"
+            "bash",
+            "-c",
+            f"source {request.model_type}/bin/activate && python train.py "
+            f"--project {request.project} "
+            f"--subproject {request.subproject} "
+            f"--task {request.task} "
+            f"--version {request.version} "
         ]
 
         # 현재 학습의 hyp 정보 로드
@@ -57,7 +54,6 @@ def train_model(request: TrainRequest):
             hyp = yaml.safe_load(f)
 
         # 현재 학습에 대한 정보를 yaml 로 저장
-        os.mkdir(f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}")
         yaml_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
 
         yaml_content = {
@@ -98,8 +94,11 @@ def train_model(request: TrainRequest):
             """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
             logger.info("[TRAINING] YOLO container training started...")
             exec_result = container.exec_run(train_command, stream=True)
+            # 학습이 종료될 때 까지 반복문이 돌아야 함
             for output in exec_result.output:
-                logger.info(output.decode('utf-8', errors='replace'))
+                continue
+                # logger.info(output.decode('utf-8', errors='replace'))
+            logger.info("[TRAINING] YOLO container training finished...")
 
             container.stop()
             container.remove(force=True)
@@ -122,7 +121,7 @@ def train_model(request: TrainRequest):
                     detail=f"[Training] 학습 실패"
                 )
 
-            file_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/training_results/results.csv"
+            file_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/training_result/results.csv"
             logger.info(f"Checking file path: {file_path}")
             logger.info(f"File exists: {os.path.exists(file_path)}")
             
@@ -153,16 +152,13 @@ def inference_model(request: InferenceRequest):
             logger.info("[INFERENCE] No old container found.")
 
         inference_command = [
-            "conda",
-            "run",
-            "-n",
-            f"{request.model_type}", # 가상 환경 이름은 모델 이름과 동일하게
-            "python",
-            "detect.py",
-            f"--project={request.project}",
-            f"--subproject={request.subproject}",
-            f"--task={request.task}",
-            f"--version={request.version}",
+            "bash",
+            "-c",
+            f"source {request.model_type}/bin/activate && python test.py "
+            f"--project {request.project} "
+            f"--subproject {request.subproject} "
+            f"--task {request.task} "
+            f"--version {request.version} "
         ]
 
         volumes = {
@@ -198,7 +194,8 @@ def inference_model(request: InferenceRequest):
             logger.info("[INFERENCE] YOLO container inference started...")
             exec_result = container.exec_run(inference_command, stream=True)
             for output in exec_result.output:
-                logger.info(output.decode('utf-8', errors='replace'))
+                continue
+            logger.info("[INFERENCE] YOLO container inference finished...")
 
             container.stop()
             container.remove(force=True)
@@ -232,15 +229,13 @@ def export_model(request: ExportRequest):
             logger.info("[EXPORT] No old container found.")
 
         export_command = [
-            "conda",
-            "run",
-            "-n",
-            f"{model_type}", # 가상 환경 이름은 모델 이름과 동일하게
-            "python",
-            "export.py",
-            f"--weights=/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/weights/best.pt",
-            f"--imgsz={imgsz}",
-            f"--opset=13"
+            "bash",
+            "-c",
+            f"source {model_type}/bin/activate && python export.py "
+            f"--project={request.project} "
+            f"--subproject={request.subproject} "
+            f"--task={request.task} "
+            f"--version={request.version} "
         ]
 
         volumes = {
@@ -277,6 +272,7 @@ def export_model(request: ExportRequest):
             exec_result = container.exec_run(export_command, stream=True)
             for output in exec_result.output:
                 logger.info(output.decode('utf-8', errors='replace'))
+            logger.info("[EXPORT] YOLO container export finished...")
 
             container.stop()
             container.remove(force=True)

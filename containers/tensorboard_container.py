@@ -1,6 +1,7 @@
 import docker
 from fastapi import HTTPException
 from models.tensorboard import TensorboardParams
+from utils import VOLUME_PATH
 import logging
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
 
         # 볼륨 설정 (예시)
         volumes = {
-            r"d:/moai": {
+            VOLUME_PATH: {
                 "bind": "/moai",
                 "mode": "rw"
             }

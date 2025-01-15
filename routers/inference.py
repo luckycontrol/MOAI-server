@@ -6,6 +6,9 @@ import subprocess
 
 import logging
 import os
+import shutil
+
+from utils import VOLUME_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +41,9 @@ async def inference(request: InferenceRequest) -> Dict:
                 )
 
         # inference_result 폴더 제거
-        inference_result_path = f"d:/moai_test/{request.project}/{request.subproject}/{request.task}/{request.version}/inference_result"
+        inference_result_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/inference_result"
         if os.path.exists(inference_result_path):
-            os.removedirs(inference_result_path)
+            shutil.rmtree(inference_result_path)
 
         inference_model(request)
 

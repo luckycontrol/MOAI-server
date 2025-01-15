@@ -1,0 +1,1 @@
+VOLUME_PATH = "/moai"
