@@ -21,6 +21,17 @@ def train_model(request: TrainRequest):
         # 컨테이너 이름 형식: project_subproject_task_version_train
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_train"
 
+        train_config_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+        with open(train_config_path, "w") as f:
+            train_config = {}
+            train_config["project"] = request.project
+            train_config["subproject"] = request.subproject
+            train_config["task"] = request.task
+            train_config["version"] = request.version
+            train_config["model_type"] = request.model_type
+            train_config["created_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            yaml.dump(train_config, f)
+
         try:
             old_container = client.containers.get(container_name)
             old_container.stop()
@@ -165,11 +176,11 @@ def export_model(request: ExportRequest):
     try:
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_export"
 
-        yaml_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
-        with open(yaml_path, 'r') as f:
-            yaml_content = yaml.safe_load(f)
-
-        model_type = yaml_content["model_type"]
+        train_config_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+        with open(train_config_path, "r") as f:
+            train_config = yaml.safe_load(f)
+        
+        model_type = train_config["model_type"]
 
         try:
             old_container = client.containers.get(container_name)
