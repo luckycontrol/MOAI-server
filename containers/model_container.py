@@ -49,12 +49,12 @@ def train_model(request: TrainRequest):
         ]
 
         # 현재 학습의 hyp 정보 로드
-        hyp_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/dataset/train_dataset/hyp.yaml"
+        hyp_path = f"/moai/{request.project}/{request.subproject}/{request.task}/dataset/train_dataset/hyp.yaml"
         with open(hyp_path, 'r', encoding='utf-8') as f:
             hyp = yaml.safe_load(f)
 
         # 현재 학습에 대한 정보를 yaml 로 저장
-        yaml_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+        yaml_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
 
         yaml_content = {
             "project": request.project,
