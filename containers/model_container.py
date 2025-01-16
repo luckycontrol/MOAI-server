@@ -186,7 +186,7 @@ def export_model(request: ExportRequest):
     try:
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_export"
 
-        yaml_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+        yaml_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
         with open(yaml_path, 'r') as f:
             yaml_content = yaml.safe_load(f)
 
