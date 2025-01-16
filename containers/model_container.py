@@ -41,33 +41,12 @@ def train_model(request: TrainRequest):
         train_command = [
             "bash",
             "-c",
-            f"source {request.model_type}/bin/activate && python train.py "
+            f"source model_env/bin/activate && python train.py "
             f"--project {request.project} "
             f"--subproject {request.subproject} "
             f"--task {request.task} "
             f"--version {request.version} "
         ]
-
-        # 현재 학습의 hyp 정보 로드
-        hyp_path = f"/moai/{request.project}/{request.subproject}/{request.task}/dataset/train_dataset/hyp.yaml"
-        with open(hyp_path, 'r', encoding='utf-8') as f:
-            hyp = yaml.safe_load(f)
-
-        # 현재 학습에 대한 정보를 yaml 로 저장
-        yaml_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
-
-        yaml_content = {
-            "project": request.project,
-            "subproject": request.subproject,
-            "task": request.task,
-            "version": request.version,
-            "model_type": request.model_type,
-            "imgsz": hyp['imgsz'],
-            "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
-        }
-
-        with open(yaml_path, 'w', encoding='utf-8') as f:
-            yaml.dump(yaml_content, f)
 
         try:
             container = client.containers.run(
@@ -127,7 +106,7 @@ def inference_model(request: InferenceRequest):
         inference_command = [
             "bash",
             "-c",
-            f"source {request.model_type}/bin/activate && python test.py "
+            f"source model_env/bin/activate && python test.py "
             f"--project {request.project} "
             f"--subproject {request.subproject} "
             f"--task {request.task} "
@@ -167,10 +146,10 @@ def inference_model(request: InferenceRequest):
             logger.info("[INFERENCE] YOLO container inference started...")
             exec_result = container.exec_run(inference_command, stream=True)
             for output in exec_result.output:
-                continue
+                logger.info(output.decode('utf-8', errors='replace'))
             logger.info("[INFERENCE] YOLO container inference finished...")
 
-            container.stop()
+            container.kill()
             container.remove(force=True)
 
         # 예측을 별도의 스레드에서 실행
@@ -203,7 +182,7 @@ def export_model(request: ExportRequest):
         export_command = [
             "bash",
             "-c",
-            f"source {model_type}/bin/activate && python export.py "
+            f"source model_env/bin/activate && python export.py "
             f"--project={request.project} "
             f"--subproject={request.subproject} "
             f"--task={request.task} "
@@ -240,13 +219,13 @@ def export_model(request: ExportRequest):
 
         def run_export(container, export_command):
             """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
-            logger.info("[EXPORT] YOLO container export started...")
+            logger.info(f"[EXPORT] container export started...")
             exec_result = container.exec_run(export_command, stream=True)
             for output in exec_result.output:
                 logger.info(output.decode('utf-8', errors='replace'))
-            logger.info("[EXPORT] YOLO container export finished...")
+            logger.info("[EXPORT] container export finished...")
 
-            container.stop()
+            container.kill()
             container.remove(force=True)
 
         # 예측을 별도의 스레드에서 실행
