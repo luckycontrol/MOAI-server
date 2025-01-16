@@ -21,7 +21,7 @@ def train_model(request: TrainRequest):
         # 컨테이너 이름 형식: project_subproject_task_version_train
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_train"
 
-        train_config_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+        train_config_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
         with open(train_config_path, "w") as f:
             train_config = {}
             train_config["project"] = request.project
@@ -176,7 +176,7 @@ def export_model(request: ExportRequest):
     try:
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_export"
 
-        train_config_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+        train_config_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
         with open(train_config_path, "r") as f:
             train_config = yaml.safe_load(f)
         
