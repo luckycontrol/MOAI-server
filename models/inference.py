@@ -5,4 +5,3 @@ class InferenceRequest(BaseModel):
     subproject: str
     task: str
     version: str
-    model_type: str
