@@ -34,10 +34,12 @@ async def inference(request: InferenceRequest) -> Dict:
             container_name = subprocess.check_output([
                 "docker", "inspect", "--format={{.Name}}", container_id
             ]).decode().strip().lstrip('/')  # Remove leading slash from name
-            if not container_name.endswith('_export'):
+            if container_name.endswith('server') or container_name.endswith('_export') or container_name.endswith('_tensorboard'):
+                continue
+            else:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Non-export container running: {container_name}"
+                    detail=f"{container_name} 컨테이너가 이미 예측 실행중"
                 )
 
         # inference_result 폴더 제거

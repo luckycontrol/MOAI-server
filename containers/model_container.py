@@ -50,7 +50,7 @@ def train_model(request: TrainRequest):
 
         # 현재 학습의 hyp 정보 로드
         hyp_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/dataset/train_dataset/hyp.yaml"
-        with open(hyp_path, 'r') as f:
+        with open(hyp_path, 'r', encoding='utf-8') as f:
             hyp = yaml.safe_load(f)
 
         # 현재 학습에 대한 정보를 yaml 로 저장
@@ -66,7 +66,7 @@ def train_model(request: TrainRequest):
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
         }
 
-        with open(yaml_path, 'w') as f:
+        with open(yaml_path, 'w', encoding='utf-8') as f:
             yaml.dump(yaml_content, f)
 
         try:
@@ -94,10 +94,9 @@ def train_model(request: TrainRequest):
             """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
             logger.info("[TRAINING] YOLO container training started...")
             exec_result = container.exec_run(train_command, stream=True)
-            # 학습이 종료될 때 까지 반복문이 돌아야 함
+
             for output in exec_result.output:
-                continue
-                # logger.info(output.decode('utf-8', errors='replace'))
+                logger.info(output.decode('utf-8', errors='replace'))
             logger.info("[TRAINING] YOLO container training finished...")
 
             container.stop()
@@ -107,32 +106,6 @@ def train_model(request: TrainRequest):
         training_thread = threading.Thread(target=run_training, args=(container, train_command))
         training_thread.daemon = True  # 메인 스레드 종료 시 함께 종료
         training_thread.start()
-
-        start_time = time.time()
-        timeout = 120  # 2분 타임아웃
-
-        # results.csv 파일 찾을 때까지 대기
-        while True:
-            # results.csv 파일을 찾는 중, 에러로 인해 모델 컨테이너가 종료되면 예외raise
-            container = client.containers.get(container_name)
-            if container.status != "running":
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"[Training] 학습 실패"
-                )
-
-            file_path = f"{VOLUME_PATH}/{request.project}/{request.subproject}/{request.task}/{request.version}/training_result/results.csv"
-            logger.info(f"Checking file path: {file_path}")
-            logger.info(f"File exists: {os.path.exists(file_path)}")
-            
-            if os.path.exists(file_path):
-                logger.info("results.csv file has been found!")
-                break
-            
-            if time.time() - start_time > timeout:
-                raise HTTPException(status_code=408, detail="Training timeout: results.csv was not generated within 2 minutes")
-            
-            time.sleep(5)  # 5초마다 확인
 
     except Exception as e:
         logger.info(f"Training failed: {str(e)}")
@@ -182,7 +155,7 @@ def inference_model(request: InferenceRequest):
                 tty=True,
                 stdin_open=True, # -i 옵션 추가
                 detach=True,
-                shm_size="32G",  # 변경된 shm-size
+                shm_size="32G",  # 변경된 shm-size,
             )
             logger.info(f"Container {container_name} started successfully.")
         except Exception as e:
@@ -218,7 +191,6 @@ def export_model(request: ExportRequest):
             yaml_content = yaml.safe_load(f)
 
         model_type = yaml_content["model_type"]
-        imgsz = yaml_content['imgsz']
 
         try:
             old_container = client.containers.get(container_name)

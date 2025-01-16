@@ -74,7 +74,7 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
             "-n",
             "tensorboard",
             "tensorboard",
-            f"--logdir=/moai/{tensorboard_params.project}/{tensorboard_params.subproject}/{tensorboard_params.task}/{tensorboard_params.version}/training_results",
+            f"--logdir=/moai/{tensorboard_params.project}/{tensorboard_params.subproject}/{tensorboard_params.task}/{tensorboard_params.version}/training_result",
             "--port",
             str(free_port),
             "--bind_all",
@@ -96,14 +96,34 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
         )
         logger.info(f"Created new container: {container_name}")
 
-        return {
-            "message": f"TensorBoard '{container_name}' 컨테이너가 성공적으로 생성되었습니다.",
-            "port": free_port
-        }
+        import requests
+        import time
 
-    except HTTPException:
-        # FastAPI용 예외는 그대로 raise
-        raise
+        # TensorBoard 페이지가 실제로 준비되었는지 검증
+        # (HTTP 200 + 응답 본문 내에 "TensorBoard" 문자열이 존재하는지 확인)
+        max_retries = 10
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(f"http://localhost:{free_port}")
+                if response.status_code == 200 and "TensorBoard" in response.text:
+                    logger.info(
+                        f"TensorBoard UI is successfully loaded on port {free_port}"
+                    )
+                    return {
+                        "message": f"TensorBoard '{container_name}' 컨테이너가 성공적으로 생성되었습니다.",
+                        "port": free_port
+                    }
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Failed to ping localhost:{free_port} - {str(e)}")
+
+            time.sleep(1)
+
+        # 충분히 재시도했음에도 UI가 뜨지 않는다면 예외 처리
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to verify TensorBoard container status after multiple attempts."
+        )
+
     except Exception as e:
         logger.error(str(e))
         # 내부적으로 컨테이너를 만들다 실패했다면 중간에 생성된 컨테이너가 있을 수 있으니 정리
@@ -139,29 +159,26 @@ def stop_tensorboard_container(tensorboard_params: TensorboardParams):
 
         # 컨테이너가 사용하고 있던 호스트 포트 추출
         # 예: {'6006/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '6006'}]}
-        ports_info = target_container.attrs.get('NetworkSettings', {}).get('Ports', {})
-        free_port = None
-        for container_port, host_mappings in ports_info.items():
-            if host_mappings and len(host_mappings) > 0:
-                free_port = host_mappings[0].get('HostPort')
-                break
+        # ports_info = target_container.attrs.get('NetworkSettings', {}).get('Ports', {})
+        # free_port = None
+        # for container_port, host_mappings in ports_info.items():
+        #     if host_mappings and len(host_mappings) > 0:
+        #         free_port = host_mappings[0].get('HostPort')
+        #         break
 
         # 컨테이너가 실행 중이면 중지
         if target_container.status == "running":
-            target_container.stop()
+            target_container.kill()
             logger.info(f"Stopped container: {target_container.name}")
 
-        # 컨테이너 제거
-        target_container.remove(force=True)
-        logger.info(f"Removed container: {target_container.name}")
+            # 컨테이너 제거
+            target_container.remove(force=True)
+            logger.info(f"Removed container: {target_container.name}")
 
-        return {
-            "message": f"TensorBoard 컨테이너 {prefix}_tensorboard 를 종료 및 제거했습니다.",
-            "port": free_port
-        }
+            return {
+                "message": f"TensorBoard 컨테이너 {prefix}_tensorboard 를 종료 및 제거했습니다."
+            }
 
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(str(e))
         raise HTTPException(status_code=400, detail=str(e))

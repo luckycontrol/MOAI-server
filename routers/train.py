@@ -33,10 +33,12 @@ async def train(request: TrainRequest) -> Dict:
             container_name = subprocess.check_output([
                 "docker", "inspect", "--format={{.Name}}", container_id
             ]).decode().strip().lstrip('/')  # Remove leading slash from name
-            if not container_name.endswith('_export') or not container_name.endswith('_tensorboard'):
+            if container_name.endswith('server') or container_name.endswith('_export') or container_name.endswith('_tensorboard'):
+                continue
+            else:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Non-export container running: {container_name}"
+                    detail=f"{container_name} 컨테이너가 이미 학습 실행중"
                 )
 
         train_model(request)
