@@ -21,7 +21,12 @@ def train_model(request: TrainRequest):
         # 컨테이너 이름 형식: project_subproject_task_version_train
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_train"
 
-        train_config_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+        version_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}"
+        if not os.path.exists(version_path):
+            os.makedirs(version_path)
+            logger.info(f"Created directory: {version_path}")
+
+        train_config_path = f"{version_path}/train_config.yaml"
         with open(train_config_path, "w") as f:
             train_config = {}
             train_config["project"] = request.project
