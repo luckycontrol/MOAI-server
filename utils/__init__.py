@@ -1,3 +1,3 @@
 import os
 
-VOLUME_PATH = "d:/jjw/moai_test"
+VOLUME_PATH = "d:/MOAI/Project"
