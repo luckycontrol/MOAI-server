@@ -82,12 +82,12 @@ def train_model(request: TrainRequest):
 
         def run_training(container, train_command):
             """학습을 실제로 수행하는 함수 (별도 스레드에서 실행)"""
-            logger.info("[TRAINING] YOLO container training started...")
+            logger.info("[TRAINING] container training started...")
             exec_result = container.exec_run(train_command, stream=True)
 
             for output in exec_result.output:
                 logger.info(output.decode('utf-8', errors='replace'))
-            logger.info("[TRAINING] YOLO container training finished...")
+            logger.info("[TRAINING] container training finished...")
 
             container.stop()
             container.remove(force=True)
@@ -105,6 +105,12 @@ def inference_model(request: InferenceRequest):
     try:
         # 컨테이너 이름. 형식: project_subproject_task_version
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_inference"
+
+        train_config_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
+        with open(train_config_path, "r") as f:
+            train_config = yaml.safe_load(f)
+        
+        model_type = train_config["model_type"]
 
         try:
             old_container = client.containers.get(container_name)
@@ -133,7 +139,7 @@ def inference_model(request: InferenceRequest):
 
         try:
             container = client.containers.run(
-                image=f"{request.model_type}:latest",  # 이미지 이름 및 태그 지정
+                image=f"{model_type}:latest",  # 이미지 이름 및 태그 지정
                 name=container_name,
                 volumes=volumes,
                 device_requests=[
