@@ -29,32 +29,32 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
                     detail=f"이미 활성화된 TensorBoard가 존재합니다: {c.name}"
                 )
 
-        # 포트 충돌 방지 등을 위해 필요하다면 여기에서 사용중인 포트를 검사하는 로직 추가
-        all_containers = client.containers.list(all=True)
-        used_ports = set()  # 이미 사용중인 포트 모음
-        for cont in all_containers:
-            # 컨테이너의 포트 정보 얻기 (예: {'6006/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '6006'}], '5000/tcp': None, ...})
-            container_ports_info = cont.attrs["NetworkSettings"].get("Ports") or {}
-            for port_protocol, mappings in container_ports_info.items():
-                if mappings:
-                    # 여러 바인딩이 있을 수 있으므로 각각 확인
-                    for m in mappings:
-                        host_port_str = m.get("HostPort")
-                        if host_port_str:
-                            used_ports.add(int(host_port_str))
+        # # 포트 충돌 방지 등을 위해 필요하다면 여기에서 사용중인 포트를 검사하는 로직 추가
+        # all_containers = client.containers.list(all=True)
+        # used_ports = set()  # 이미 사용중인 포트 모음
+        # for cont in all_containers:
+        #     # 컨테이너의 포트 정보 얻기 (예: {'6006/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '6006'}], '5000/tcp': None, ...})
+        #     container_ports_info = cont.attrs["NetworkSettings"].get("Ports") or {}
+        #     for port_protocol, mappings in container_ports_info.items():
+        #         if mappings:
+        #             # 여러 바인딩이 있을 수 있으므로 각각 확인
+        #             for m in mappings:
+        #                 host_port_str = m.get("HostPort")
+        #                 if host_port_str:
+        #                     used_ports.add(int(host_port_str))
 
-        free_port = None
-        for port_to_try in range(50000, 51000):
-            if port_to_try not in used_ports:
-                free_port = port_to_try
-                break
+        # free_port = None
+        # for port_to_try in range(50000, 51000):
+        #     if port_to_try not in used_ports:
+        #         free_port = port_to_try
+        #         break
 
-        if free_port is None:
-            # 50000 ~ 50999 포트가 모두 사용중이라면 에러
-            raise HTTPException(
-                status_code=400,
-                detail="50000~50999 범위 내 사용 가능한 포트를 찾을 수 없습니다."
-            )
+        # if free_port is None:
+        #     # 50000 ~ 50999 포트가 모두 사용중이라면 에러
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail="50000~50999 범위 내 사용 가능한 포트를 찾을 수 없습니다."
+        #     )
 
         # 최종적으로 만들 컨테이너 이름
         container_name = f"{new_prefix}_tensorboard"
@@ -67,34 +67,41 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
             }
         }
 
-        # TensorBoard 실행 명령어 (conda 환경 예시)
-        run_tensorboard_command = [
-            "conda",
-            "run",
-            "-n",
-            "tensorboard",
-            "tensorboard",
-            f"--logdir=/moai/{tensorboard_params.project}/{tensorboard_params.subproject}/{tensorboard_params.task}/{tensorboard_params.version}/training_result",
-            "--port",
-            str(free_port),
-            "--bind_all",
-        ]
+        for port in range(50000, 51000):
+            try:
+                ports_mapping = {f"{port}/tcp": port}
 
-        # 필요하다면 ports 매핑 추가 (예: 6006 -> 6006)
-        ports_mapping = {f"{free_port}": free_port}
+                run_tensorboard_command = [
+                    "tensorboard",
+                    f"--logdir=/moai/{tensorboard_params.project}/{tensorboard_params.subproject}/{tensorboard_params.task}/{tensorboard_params.version}/training_result",
+                    "--port",
+                    str(port),
+                    "--bind_all",
+                ]
 
-        # 컨테이너 실행
-        container = client.containers.run(
-            image="moai_tensorboard:latest",
-            command=run_tensorboard_command,
-            name=container_name,
-            volumes=volumes,
-            ports=ports_mapping,
-            detach=True,
-            tty=True,
-            stdin_open=True
-        )
-        logger.info(f"Created new container: {container_name}")
+                container = client.containers.run(
+                    image="moai_tensorboard:latest",
+                    command=run_tensorboard_command,
+                    name=container_name,
+                    volumes=volumes,
+                    ports=ports_mapping,
+                    detach=True,
+                    tty=True,
+                    stdin_open=True
+                )
+                logger.info(f"Created new container: {container_name} on port {port}")
+                break
+            except docker.errors.APIError as e:
+                if "port is already allocated" in str(e):
+                    logger.warning(f"Port {port} is already in use, trying next port")
+                    continue
+                else:
+                    logger.error(f"Error creating container: {e}")
+                    raise HTTPException(status_code=500, detail=str(e))
+        else:
+            logger.error("Failed to find an available port in range 50000-50999")
+            raise HTTPException(status_code=500, detail="No available ports found")
+
 
         import requests
         import time
