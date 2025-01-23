@@ -67,6 +67,7 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
             }
         }
 
+        selected_port = None
         for port in range(50000, 51000):
             try:
                 ports_mapping = {f"{port}/tcp": port}
@@ -90,6 +91,7 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
                     stdin_open=True
                 )
                 logger.info(f"Created new container: {container_name} on port {port}")
+                selected_port = port
                 break
             except docker.errors.APIError as e:
                 if "port is already allocated" in str(e):
@@ -111,17 +113,17 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
         max_retries = 60
         for attempt in range(max_retries):
             try:
-                response = requests.get(f"http://localhost:{free_port}")
+                response = requests.get(f"http://localhost:{selected_port}")
                 if response.status_code == 200 and "TensorBoard" in response.text:
                     logger.info(
-                        f"TensorBoard UI is successfully loaded on port {free_port}"
+                        f"TensorBoard UI is successfully loaded on port {selected_port}"
                     )
                     return {
                         "message": f"TensorBoard '{container_name}' 컨테이너가 성공적으로 생성되었습니다.",
-                        "port": free_port
+                        "port": selected_port
                     }
             except requests.exceptions.RequestException as e:
-                logger.error(f"Failed to ping localhost:{free_port} - {str(e)}")
+                logger.error(f"Failed to ping localhost:{selected_port} - {str(e)}")
 
             time.sleep(1)
 
