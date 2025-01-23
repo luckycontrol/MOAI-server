@@ -99,13 +99,9 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
         max_retries = 60
         for attempt in range(max_retries):
             try:
-                # Get the Docker host IP
-                docker_host_ip = client.info()['Swarm']['NodeAddr']
-                if not docker_host_ip or docker_host_ip == '0.0.0.0':
-                    docker_host_ip = '127.0.0.1'  # Fallback to localhost if unable to get Docker host IP
 
                 # Use the Docker host IP instead of localhost
-                response = requests.get(f"http://{docker_host_ip}:{selected_port}")
+                response = requests.get(f"http://192.168.100.40:{selected_port}")
 
                 if response.status_code == 200 and "TensorBoard" in response.text:
                     logger.info(
