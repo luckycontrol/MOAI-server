@@ -104,7 +104,7 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
         max_retries = 10
         for attempt in range(max_retries):
             try:
-                response = requests.get(f"http://localhost:{free_port}")
+                response = requests.get(f"http://{container_name}:{free_port}")
                 if response.status_code == 200 and "TensorBoard" in response.text:
                     logger.info(
                         f"TensorBoard UI is successfully loaded on port {free_port}"
@@ -116,7 +116,7 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
             except requests.exceptions.RequestException as e:
                 logger.error(f"Failed to ping localhost:{free_port} - {str(e)}")
 
-            time.sleep(1)
+            time.sleep(2)
 
         # 충분히 재시도했음에도 UI가 뜨지 않는다면 예외 처리
         raise HTTPException(

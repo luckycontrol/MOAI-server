@@ -2,8 +2,12 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict
 import docker
 import logging
+import shutil
 
 from models.stop import StopParams  # stopParams가 정의된 모델
+
+from utils import VOLUME_PATH
+
 # 필요하다면 pydantic도 import 하세요. (이미 stop.py에서 StopParams를 import하는 것으로 가정)
 
 logger = logging.getLogger(__name__)
@@ -41,6 +45,12 @@ async def stop(stop_params: StopParams) -> Dict:
         train_container.kill()
         train_container.remove()
         stopped_containers.append(train_container_name)
+
+        # 학습중이던 컨테이너의 모델을 training_result 폴더 밖으로 이동
+        training_result_path = f"{VOLUME_PATH}/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}/training_result"
+        if os.path.exists(training_result_path) and os.path.exists(f"{training_result_path}/weights"):
+            shutil.move(f"{training_result_path}/weights", training_result_path)
+
     except docker.errors.NotFound:
         logger.info(f"컨테이너 {train_container_name} 는 동작 중이 아닙니다.")
     except Exception as e:
