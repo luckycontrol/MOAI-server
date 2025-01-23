@@ -53,6 +53,10 @@ def create_tensorboard_container(tensorboard_params: TensorboardParams):
                 ports_mapping = {f"{port}/tcp": port}
 
                 run_tensorboard_command = [
+                    "conda",
+                    "run",
+                    "-n",
+                    "tensorboard",
                     "tensorboard",
                     f"--logdir=/moai/{tensorboard_params.project}/{tensorboard_params.subproject}/{tensorboard_params.task}/{tensorboard_params.version}/training_result",
                     "--port",
