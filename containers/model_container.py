@@ -169,7 +169,7 @@ def inference_model(request: InferenceRequest):
                 tty=True,
                 stdin_open=True,
                 detach=True,
-                shm_size="32G",
+                # shm_size="32G",
             )
             elapsed = time.time() - start
             logger.info(f"Container {container_name} started successfully in {elapsed:.3f} seconds.")
