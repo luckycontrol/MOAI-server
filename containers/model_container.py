@@ -57,7 +57,7 @@ def train_model(request: TrainRequest):
         train_command = [
             "bash",
             "-c",
-            f"source model_env/bin/activate && python train.py "
+            f"python train.py "
             f"--project {request.project} "
             f"--subproject {request.subproject} "
             f"--task {request.task} "
@@ -128,7 +128,7 @@ def inference_model(request: InferenceRequest):
         inference_command = [
             "bash",
             "-c",
-            f"source model_env/bin/activate && python test.py "
+            f"python test.py "
             f"--project {request.project} "
             f"--subproject {request.subproject} "
             f"--task {request.task} "
@@ -144,7 +144,7 @@ def inference_model(request: InferenceRequest):
 
         try:
             container = client.containers.run(
-                image=f"{model_type}:latest",  # 이미지 이름 및 태그 지정
+                image=f"{model_type}:test",  # 이미지 이름 및 태그 지정
                 name=container_name,
                 volumes=volumes,
                 device_requests=[
@@ -204,7 +204,7 @@ def export_model(request: ExportRequest):
         export_command = [
             "bash",
             "-c",
-            f"source model_env/bin/activate && python export.py "
+            f"python export.py "
             f"--project={request.project} "
             f"--subproject={request.subproject} "
             f"--task={request.task} "
