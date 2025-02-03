@@ -55,9 +55,7 @@ def train_model(request: TrainRequest):
 
         # 컨테이너 내부에서 모델 실행 명령어
         train_command = [
-            "bash",
-            "-c",
-            f"source model_env/bin/activate && python train.py "
+            f"python train.py "
             f"--project {request.project} "
             f"--subproject {request.subproject} "
             f"--task {request.task} "
@@ -78,7 +76,7 @@ def train_model(request: TrainRequest):
                 tty=True,
                 stdin_open=True, # -i 옵션 추가
                 detach=True,
-                shm_size="32G",  # 변경된 shm-size
+                # shm_size="32G",  # 변경된 shm-size
             )
             logger.info(f"Container {container_name} started successfully.")
         except Exception as e:
