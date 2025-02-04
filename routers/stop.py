@@ -46,11 +46,11 @@ async def stop(stop_params: StopParams) -> Dict:
         try:
             train_container.kill()
             # 학습중인 컨테이너의 모델 파일 이동 처리
-            training_result_path = f"/moai/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}/training_result"
-            weights_path = os.path.join(training_result_path, "weights")
-            if os.path.exists(training_result_path) and os.path.exists(weights_path) and any(f.endswith('.pt') for f in os.listdir(weights_path)):
+            version_path = f"/moai/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}"
+            weights_path = os.path.join(version_path, "training_result", "weights")
+            if os.path.exists(version_path) and os.path.exists(weights_path) and any(f.endswith('.pt') for f in os.listdir(weights_path)):
                 with thread_lock:
-                    shutil.move(weights_path, training_result_path)
+                    shutil.move(weights_path, version_path)
             return {
                 "status": "success",
                 "message": f"컨테이너({train_container_name}) 중단 완료"
