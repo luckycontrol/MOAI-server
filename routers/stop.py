@@ -40,7 +40,6 @@ async def stop(stop_params: StopParams) -> Dict:
     try:
         train_container = client.containers.get(train_container_name)
         train_container.kill()
-        train_container.remove()
 
         # 학습중이던 컨테이너의 모델을 training_result 폴더 밖으로 이동
         training_result_path = f"/moai/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}/training_result"
@@ -65,7 +64,6 @@ async def stop(stop_params: StopParams) -> Dict:
     try:
         inference_container = client.containers.get(inference_container_name)
         inference_container.kill()
-        inference_container.remove()
 
         # 성공적으로 컨테이너가 중단되었음을 반환
         return {
