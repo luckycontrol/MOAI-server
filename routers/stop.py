@@ -62,7 +62,7 @@ async def stop(stop_params: StopParams) -> Dict:
         }
 
     else:
-        raise HTTPException(
+        return HTTPException(
             status_code=400,
             detail=f"해당 조합({stop_params.project}, {stop_params.subproject}, {stop_params.task}, {stop_params.version})의 컨테이너가 없습니다."
         )
