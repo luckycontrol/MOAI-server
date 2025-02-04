@@ -50,7 +50,7 @@ async def stop(stop_params: StopParams) -> Dict:
             weights_path = os.path.join(training_result_path, "weights")
             if os.path.exists(training_result_path) and os.path.exists(weights_path) and any(f.endswith('.pt') for f in os.listdir(weights_path)):
                 with thread_lock:
-                    shutil.move(training_result_path, weights_path)
+                    shutil.move(weights_path, training_result_path)
             return {
                 "status": "success",
                 "message": f"컨테이너({train_container_name}) 중단 완료"
