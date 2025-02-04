@@ -245,6 +245,11 @@ def export_model(request: ExportRequest):
             exec_result = container.exec_run(export_command, stream=True)
             for output in exec_result.output:
                 logger.info(output.decode('utf-8', errors='replace'))
+
+            export_end_txt_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/weights/export_end.txt"
+            with open(export_end_txt_path, "w") as f:
+                f.write("export finished\n")
+
             logger.info("[EXPORT] container export finished...")
 
             container.kill()
