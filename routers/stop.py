@@ -2,11 +2,10 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict
 import docker
 import logging
+import os
 import shutil
 
 from models.stop import StopParams  # stopParams가 정의된 모델
-
-from utils import VOLUME_PATH
 
 # 필요하다면 pydantic도 import 하세요. (이미 stop.py에서 StopParams를 import하는 것으로 가정)
 
@@ -57,7 +56,7 @@ async def stop(stop_params: StopParams) -> Dict:
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail=f"{train_container_name} 컨테이너 중단 중 오류 발생: {str(e)}"
+            detail=str(e)
         )
 
     # inference 컨테이너 중단 시도
@@ -76,7 +75,7 @@ async def stop(stop_params: StopParams) -> Dict:
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail=f"{inference_container_name} 컨테이너 중단 중 오류 발생: {str(e)}"
+            detail=str(e)
         )
 
     
