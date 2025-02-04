@@ -6,7 +6,6 @@ import logging
 import os
 import shutil
 import threading
-from distutils.dir_util import copy_tree
 
 thread_lock = threading.Lock()
 
@@ -51,8 +50,8 @@ async def stop(stop_params: StopParams) -> Dict:
             weights_path = os.path.join(version_path, "training_result", "weights")
             if os.path.exists(version_path) and os.path.exists(weights_path) and any(f.endswith('.pt') for f in os.listdir(weights_path)):
                 with thread_lock:
-                    copy_tree(weights_path, version_path)
-                    # shutil.move(weights_path, version_path)
+                    shutil.move(weights_path, version_path)
+
             return {
                 "status": "success",
                 "message": f"컨테이너({train_container_name}) 중단 완료"
