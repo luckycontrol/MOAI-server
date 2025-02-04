@@ -36,20 +36,22 @@ async def stop(stop_params: StopParams) -> Dict:
     # Docker 클라이언트 초기화
     client = docker.from_env()
 
-    # 중단한 컨테이너를 기록할 리스트
-    stopped_containers = []
-
     # train 컨테이너 중단 시도
     try:
         train_container = client.containers.get(train_container_name)
         train_container.kill()
         train_container.remove()
-        stopped_containers.append(train_container_name)
 
         # 학습중이던 컨테이너의 모델을 training_result 폴더 밖으로 이동
         training_result_path = f"{VOLUME_PATH}/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}/training_result"
         if os.path.exists(training_result_path) and os.path.exists(f"{training_result_path}/weights"):
             shutil.move(f"{training_result_path}/weights", training_result_path)
+
+        # 성공적으로 컨테이너가 중단되었음을 반환
+        return {
+            "status": "success",
+            "message": f"컨테이너({', '.join(train_container)}) 중단 완료"
+        }
 
     except docker.errors.NotFound:
         logger.info(f"컨테이너 {train_container_name} 는 동작 중이 아닙니다.")
@@ -64,7 +66,13 @@ async def stop(stop_params: StopParams) -> Dict:
         inference_container = client.containers.get(inference_container_name)
         inference_container.kill()
         inference_container.remove()
-        stopped_containers.append(inference_container_name)
+
+        # 성공적으로 컨테이너가 중단되었음을 반환
+        return {
+            "status": "success",
+            "message": f"컨테이너({', '.join(inference_container)}) 중단 완료"
+        }
+
     except docker.errors.NotFound:
         logger.info(f"컨테이너 {inference_container_name} 는 동작 중이 아닙니다.")
     except Exception as e:
@@ -73,15 +81,4 @@ async def stop(stop_params: StopParams) -> Dict:
             detail=f"{inference_container_name} 컨테이너 중단 중 오류 발생: {str(e)}"
         )
 
-    # 실제로 중단된 컨테이너가 하나도 없다면 예외 발생
-    if not stopped_containers:
-        raise HTTPException(
-            status_code=400,
-            detail="해당 이름의 컨테이너가 동작 중이지 않습니다."
-        )
-
-    # 성공적으로 컨테이너가 중단되었음을 반환
-    return {
-        "status": "success",
-        "message": f"컨테이너({', '.join(stopped_containers)}) 중단 완료"
-    }
+    
