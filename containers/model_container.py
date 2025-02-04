@@ -186,6 +186,11 @@ def inference_model(request: InferenceRequest):
 def export_model(request: ExportRequest):
     try:
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_export"
+        export_end_txt_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/weights/export_end.txt"
+
+        if os.path.exists(export_end_txt_path):
+            os.remove(export_end_txt_path)
+            logger.info(f"[EXPORT] Removed export_end.txt: {export_end_txt_path}")
 
         train_config_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/train_config.yaml"
         with open(train_config_path, "r") as f:
@@ -246,7 +251,7 @@ def export_model(request: ExportRequest):
             for output in exec_result.output:
                 logger.info(output.decode('utf-8', errors='replace'))
 
-            export_end_txt_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}/weights/export_end.txt"
+            
             with open(export_end_txt_path, "w") as f:
                 f.write("export finished\n")
 
