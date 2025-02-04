@@ -43,14 +43,14 @@ async def stop(stop_params: StopParams) -> Dict:
         train_container.remove()
 
         # 학습중이던 컨테이너의 모델을 training_result 폴더 밖으로 이동
-        training_result_path = f"{VOLUME_PATH}/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}/training_result"
+        training_result_path = f"/moai/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}/training_result"
         if os.path.exists(training_result_path) and os.path.exists(f"{training_result_path}/weights"):
             shutil.move(f"{training_result_path}/weights", training_result_path)
 
         # 성공적으로 컨테이너가 중단되었음을 반환
         return {
             "status": "success",
-            "message": f"컨테이너({', '.join(train_container)}) 중단 완료"
+            "message": f"컨테이너({train_container_name}) 중단 완료"
         }
 
     except docker.errors.NotFound:
@@ -70,7 +70,7 @@ async def stop(stop_params: StopParams) -> Dict:
         # 성공적으로 컨테이너가 중단되었음을 반환
         return {
             "status": "success",
-            "message": f"컨테이너({', '.join(inference_container)}) 중단 완료"
+            "message": f"컨테이너({inference_container_name}) 중단 완료"
         }
 
     except docker.errors.NotFound:
