@@ -35,9 +35,10 @@ async def stop(stop_params: StopParams) -> Dict:
     # Docker 클라이언트 초기화
     client = docker.from_env()
 
-    # train 컨테이너 중단 시도
-    try:
-        train_container = client.containers.get(train_container_name)
+    train_container = client.containers.get(train_container_name)
+    inference_container = client.containers.get(inference_container_name)
+
+    if train_container is not None:
         train_container.kill()
 
         # 학습중이던 컨테이너의 모델을 training_result 폴더 밖으로 이동
@@ -51,17 +52,7 @@ async def stop(stop_params: StopParams) -> Dict:
             "message": f"컨테이너({train_container_name}) 중단 완료"
         }
 
-    except docker.errors.NotFound:
-        logger.info(f"컨테이너 {train_container_name} 는 동작 중이 아닙니다.")
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
-
-    # inference 컨테이너 중단 시도
-    try:
-        inference_container = client.containers.get(inference_container_name)
+    elif inference_container is not None:
         inference_container.kill()
 
         # 성공적으로 컨테이너가 중단되었음을 반환
@@ -70,12 +61,9 @@ async def stop(stop_params: StopParams) -> Dict:
             "message": f"컨테이너({inference_container_name}) 중단 완료"
         }
 
-    except docker.errors.NotFound:
-        logger.info(f"컨테이너 {inference_container_name} 는 동작 중이 아닙니다.")
-    except Exception as e:
+    else:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=f"해당 조합({stop_params.project}, {stop_params.subproject}, {stop_params.task}, {stop_params.version})의 컨테이너가 없습니다."
         )
-
     
