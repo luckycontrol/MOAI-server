@@ -45,7 +45,7 @@ async def stop(stop_params: StopParams) -> Dict:
             # 학습중인 컨테이너의 모델 파일 이동 처리
             training_result_path = f"/moai/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}/training_result"
             weights_path = os.path.join(training_result_path, "weights")
-            if os.path.exists(training_result_path) and os.path.exists(weights_path):
+            if os.path.exists(training_result_path) and os.path.exists(weights_path) and any(f.endswith('.pt') for f in os.listdir(weights_path)):
                 shutil.move(training_result_path, weights_path)
             return {
                 "status": "success",
