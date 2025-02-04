@@ -46,7 +46,7 @@ async def stop(stop_params: StopParams) -> Dict:
             training_result_path = f"/moai/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}/training_result"
             weights_path = os.path.join(training_result_path, "weights")
             if os.path.exists(training_result_path) and os.path.exists(weights_path):
-                shutil.move(weights_path, training_result_path)
+                shutil.move(training_result_path, weights_path)
             return {
                 "status": "success",
                 "message": f"컨테이너({train_container_name}) 중단 완료"
