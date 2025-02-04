@@ -20,7 +20,7 @@ def train_model(request: TrainRequest):
     try:
         # 컨테이너 이름 형식: project_subproject_task_version_train
         container_name = f"{request.project}_{request.subproject}_{request.task}_{request.version}_train"
-
+        
         version_path = f"/moai/{request.project}/{request.subproject}/{request.task}/{request.version}"
         if not os.path.exists(version_path):
             os.makedirs(version_path)
@@ -144,7 +144,7 @@ def inference_model(request: InferenceRequest):
 
         try:
             container = client.containers.run(
-                image=f"{model_type}:test",  # 이미지 이름 및 태그 지정
+                image=f"{model_type}:latest",  # 이미지 이름 및 태그 지정
                 name=container_name,
                 volumes=volumes,
                 device_requests=[
