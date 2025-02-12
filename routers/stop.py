@@ -43,14 +43,36 @@ async def stop(stop_params: StopParams) -> Dict:
         train_container = None
 
     if train_container:
+        print("종료 컨테이너 발견")
         try:
-            train_container.kill()
             # 학습중인 컨테이너의 모델 파일 이동 처리
             version_path = f"/moai/{stop_params.project}/{stop_params.subproject}/{stop_params.task}/{stop_params.version}"
-            weights_path = os.path.join(version_path, "training_result", "weights")
-            if os.path.exists(version_path) and os.path.exists(weights_path) and any(f.endswith('.pt') for f in os.listdir(weights_path)):
-                with thread_lock:
-                    shutil.move(weights_path, version_path)
+
+            best_pt_path = f"{version_path}/training_result/weights/best.pt"
+            last_pt_path = f"{version_path}/training_result/weights/last.pt"
+
+            if os.path.exists(best_pt_path) and os.path.exists(last_pt_path):
+                print("best.pt, last.pt 발견")
+                while True:
+                    best_pt_size = os.path.getsize(best_pt_path)
+                    last_pt_size = os.path.getsize(last_pt_path)
+
+                    if best_pt_size != 0 and last_pt_size != 0 and best_pt_size == last_pt_size:
+                        break
+
+                    print("best.pt와 last.pt의 размер이 같지 않습니다. 현재 best.pt의 размер: ", best_pt_size)
+
+                print("best.pt와 last.pt의 размер이 같습니다.")
+
+                # 모델 파일 이동
+                os.makedirs(f"{version_path}/weights", exist_ok=True)
+                best_pt_destination = f"{version_path}/weights/best.pt"
+                last_pt_destination = f"{version_path}/weights/last.pt"
+
+                shutil.move(best_pt_path, best_pt_destination)
+                shutil.move(last_pt_path, last_pt_destination)
+
+            train_container.kill()
 
             return {
                 "status": "success",
